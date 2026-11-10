@@ -1,0 +1,109 @@
+{
+  "EBAY_CLIENT_ID": "",
+  "EBAY_CLIENT_SECRET": "",
+  "EBAY_MARKETPLACE": "EBAY_US",
+  "EBAY_ACTIVE_HAIRCUT": 0.85,
+  "EBAY_FALLBACK": true,
+  "XIMILAR_TOKEN": "",
+  "XIMILAR_DAILY_CAP": 1000,
+  "XIMILAR_AUTO": true,
+  "XIMILAR_PER_CYCLE": 12,
+  "PSA_TOKEN": "",
+  "PSA_DAILY_CAP": 80,
+  "MAX_BUY_EUR": 500,
+  "ALERT_RATIO": 1.25,
+  "WORKLIST_RATIO": 1.15,
+  "OFFER_MAX_ASK_OVER_COMP": 1.15,
+  "SUSPECT_RATIO": 5,
+  "RAW_SUSPECT_EUR": 100,
+  "MAX_COMP_AGE_DAYS": 365,
+  "EBAY_FEE_PCT": 0.13,
+  "SCAN_INTERVAL_MIN": 10,
+  "MAX_EVAL_PER_CYCLE": 20,
+  "DASHBOARD_PORT": 8484,
+  "TRACKER_INTERVAL_MIN": 30,
+  "MARKET_WATCH": [
+    {
+      "name": "Wembanyama Prizm #136 PSA 10",
+      "title": "Victor Wembanyama 2023 Panini Prizm #136 PSA 10"
+    },
+    {
+      "name": "Wembanyama Prizm #136 raw",
+      "title": "Victor Wembanyama 2023 Panini Prizm #136"
+    },
+    {
+      "name": "Yamal Topps Chrome #64 PSA 10",
+      "title": "Lamine Yamal 2023 Topps Chrome #64 PSA 10"
+    },
+    {
+      "name": "Messi Prizm WC #7 raw",
+      "title": "Lionel Messi 2022 Prizm World Cup #7"
+    }
+  ],
+  "MIN_ASK_EUR": 10,
+  "WATCHLIST_MIN_EUR": 10,
+  "WATCHLIST_MAX_NOTIFY_PER_CYCLE": 5,
+  "SEARCH_CATALOG": "4875",
+  "SEARCH_BRAND_IDS": [
+    "281651",
+    "289824"
+  ],
+  "WATCHLIST": [
+    {
+      "name": "Messi",
+      "terms": [
+        "messi"
+      ]
+    },
+    {
+      "name": "Ronaldo",
+      "terms": [
+        "ronaldo",
+        "cr7"
+      ]
+    },
+    {
+      "name": "Yamal",
+      "terms": [
+        "yamal"
+      ]
+    },
+    {
+      "name": "Dowman",
+      "terms": [
+        "dowman"
+      ]
+    },
+    {
+      "name": "Ngumoha",
+      "terms": [
+        "ngumoha"
+      ]
+    }
+  ],
+  "VINTED_DOMAIN": "vinted.lt",
+  "FEEDS": [
+    {
+      "name": "panini-topps-cards",
+      "url": "https://www.vinted.lt/catalog?search_text=&catalog[]=4875&price_from=8.00&currency=EUR&brand_ids[]=281651&brand_ids[]=289824&order=newest_first"
+    }
+  ],
+  "SEARCHES": [
+    "psa 10",
+    "psa kortelė",
+    "topps chrome",
+    "panini prizm",
+    "slab card",
+    "wembanyama",
+    "yamal topps",
+    "messi prizm"
+  ],
+  "CARDHEDGER_TOKEN": "",
+  "CARDHEDGER_DAILY_CAP": 1000,
+  "CARDHEDGER_CACHE_HOURS": 24,
+  "CARDHEDGER_FALLBACK": true,
+  "CERT_OCR_AUTO": true,
+  "CERT_OCR_PER_CYCLE": 12,
+  "CERT_MAX_STALE_DAYS": 120,
+  "AMBIGUOUS_SPREAD": 1.5
+}

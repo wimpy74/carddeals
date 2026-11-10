@@ -1,0 +1,740 @@
+<!-- CARDDEALS terminal dashboard — no dependencies, polls /data every 30s -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CARDDEALS terminal</title>
+<style>
+:root {
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2129; --border:#30363d;
+  --ink:#e6edf3; --ink2:#9aa4af; --muted:#6e7681;
+  --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#58a6ff;
+  --led-off:#30363d; color-scheme:dark;
+}
+[data-theme="light"] {
+  --bg:#f6f8fa; --panel:#ffffff; --panel2:#eef1f4; --border:#d0d7de;
+  --ink:#1f2328; --ink2:#59636e; --muted:#818b98;
+  --green:#1a7f37; --amber:#9a6700; --red:#cf222e; --blue:#0969da;
+  --led-off:#d0d7de; color-scheme:light;
+}
+* { box-sizing:border-box; margin:0; }
+body {
+  background:var(--bg); color:var(--ink);
+  font:14px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  padding:14px; max-width:1200px; margin:0 auto;
+}
+header { display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding-bottom:12px; }
+h1 { font-size:17px; letter-spacing:2px; font-weight:700; }
+h1 .dim { color:var(--muted); font-weight:400; }
+.leds { display:flex; gap:14px; margin-left:auto; align-items:center; }
+.led { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--ink2); }
+.led i { width:9px; height:9px; border-radius:50%; background:var(--led-off); display:inline-block; }
+.led.ok i { background:var(--green); box-shadow:0 0 6px var(--green); }
+.led.warn i { background:var(--amber); box-shadow:0 0 6px var(--amber); }
+.led.err i { background:var(--red); box-shadow:0 0 6px var(--red); }
+#clock { font-size:12px; color:var(--ink2); }
+#theme { background:var(--panel); color:var(--ink); border:1px solid var(--border); border-radius:6px; padding:4px 10px; cursor:pointer; font:inherit; font-size:12px; }
+nav { display:flex; gap:2px; margin-bottom:14px; border-bottom:1px solid var(--border); }
+nav button { background:none; border:none; color:var(--ink2); font:inherit; font-size:13px; letter-spacing:1px; padding:8px 16px; cursor:pointer; border-bottom:2px solid transparent; }
+nav button.on { color:var(--ink); border-bottom-color:var(--green); }
+.band { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:14px; }
+.stat { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:12px 14px; }
+.stat .k { font-size:10px; letter-spacing:1.5px; color:var(--ink2); }
+.stat .v { font-size:26px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:2px; }
+.stat .v.green { color:var(--green); } .stat .v.amber { color:var(--amber); } .stat .v.red { color:var(--red); }
+.tickerwrap { overflow:hidden; background:var(--panel); border:1px solid var(--border); border-radius:8px; margin-bottom:14px; white-space:nowrap; }
+.ticker { display:inline-block; padding:7px 0; animation:scroll 60s linear infinite; }
+.tickerwrap:hover .ticker { animation-play-state:paused; }
+@keyframes scroll { from { transform:translateX(0); } to { transform:translateX(-50%); } }
+.ticker span { margin:0 18px; font-size:12px; color:var(--ink2); }
+.ticker b { color:var(--ink); font-weight:600; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+@media (max-width:800px){ .grid2 { grid-template-columns:1fr; } }
+.panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:14px; }
+.panel h2 { font-size:11px; letter-spacing:1.5px; color:var(--ink2); margin-bottom:10px; font-weight:600; }
+svg text { font:10px ui-monospace, Menlo, monospace; fill:var(--ink2); }
+.vrow { display:flex; align-items:center; gap:8px; margin:5px 0; font-size:12px; }
+.vrow .lbl { width:150px; color:var(--ink2); }
+.vrow .bar { height:10px; border-radius:4px; min-width:2px; }
+.vrow .n { color:var(--ink); font-variant-numeric:tabular-nums; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+th { text-align:left; font-size:10px; letter-spacing:1px; color:var(--ink2); padding:6px 8px; cursor:pointer; user-select:none; border-bottom:1px solid var(--border); white-space:nowrap; }
+td { padding:6px 8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+tr:hover td { background:var(--panel2); }
+td img { width:44px; height:56px; object-fit:cover; border-radius:4px; background:var(--panel2); display:block; }
+.badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; letter-spacing:.5px; border:1px solid; }
+.badge.deal { color:var(--green); border-color:var(--green); }
+.badge.worklist { color:var(--amber); border-color:var(--amber); }
+.badge.offer { color:var(--blue); border-color:var(--blue); }
+.badge.low_confidence, .badge.no_deal, .badge.skip_lot, .badge.skip_no_price { color:var(--muted); border-color:var(--border); }
+.badge.suspect { color:var(--red); border-color:var(--red); }
+a { color:var(--blue); text-decoration:none; } a:hover { text-decoration:underline; }
+.star, .dis { cursor:pointer; background:none; border:none; font-size:15px; color:var(--muted); }
+.reeval { background:var(--panel2); border:1px solid var(--border); color:var(--ink2); font:inherit; font-size:10px; border-radius:5px; padding:2px 7px; cursor:pointer; margin-right:4px; }
+.reeval:hover:not(:disabled) { color:var(--ink); border-color:var(--blue); }
+.reeval:disabled { opacity:.4; cursor:not-allowed; }
+.star.on { color:var(--amber); }
+.dis:hover { color:var(--red); }
+.filters { display:flex; gap:8px; margin-bottom:10px; }
+.filters button { background:var(--panel2); border:1px solid var(--border); color:var(--ink2); font:inherit; font-size:11px; border-radius:6px; padding:4px 12px; cursor:pointer; }
+.filters button.on { color:var(--ink); border-color:var(--green); }
+.mcard { margin-bottom:12px; }
+.mhead { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
+.mhead .name { font-size:13px; font-weight:600; }
+.mhead .cur { font-size:13px; color:var(--green); font-variant-numeric:tabular-nums; }
+.mhead .mm { font-size:11px; color:var(--ink2); }
+.zoom { margin-left:auto; display:flex; gap:4px; }
+.zoom button { background:none; border:1px solid var(--border); color:var(--ink2); font:inherit; font-size:10px; border-radius:5px; padding:2px 8px; cursor:pointer; }
+.zoom button.on { color:var(--ink); border-color:var(--green); }
+/* ---- Listings browser ---- */
+.fbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.fbar input[type=search], .fbar input[type=number] {
+  background:var(--panel2); border:1px solid var(--border); color:var(--ink);
+  font:inherit; font-size:12px; border-radius:6px; padding:5px 9px;
+}
+.fbar input[type=search] { min-width:190px; flex:1 1 190px; }
+.fbar input[type=number] { width:72px; }
+.fbar label { font-size:11px; color:var(--ink2); }
+.fgroup { display:flex; gap:4px; align-items:center; }
+.fgroup .dash { color:var(--muted); }
+.fgroup button, .ghost {
+  background:var(--panel2); border:1px solid var(--border); color:var(--ink2);
+  font:inherit; font-size:11px; border-radius:6px; padding:5px 11px; cursor:pointer;
+}
+.fgroup button.on { color:var(--ink); border-color:var(--green); }
+.ghost:hover { color:var(--ink); }
+.fcount { font-size:11px; color:var(--muted); margin-left:auto; font-variant-numeric:tabular-nums; }
+.cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:10px; }
+.card {
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  overflow:hidden; display:flex; flex-direction:column; position:relative;
+}
+.card .ph { aspect-ratio:3/4; background:var(--panel2); overflow:hidden; }
+.card .ph img { width:100%; height:100%; object-fit:cover; display:block; }
+.card .body { padding:8px 9px 9px; display:flex; flex-direction:column; gap:5px; flex:1; }
+.card .t { font-size:11.5px; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.card .t a { color:var(--ink); }
+.card .t a:hover { color:var(--blue); }
+.card .row { display:flex; align-items:center; gap:6px; margin-top:auto; }
+.card .price { font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; }
+.card .meta { font-size:10px; color:var(--muted); }
+.card .marks { position:absolute; top:6px; left:6px; display:flex; gap:4px; flex-wrap:wrap; max-width:calc(100% - 44px); }
+.card .actions { position:absolute; top:4px; right:4px; display:flex; flex-direction:column; gap:2px; }
+.card .actions button { background:rgba(0,0,0,.55); border:none; border-radius:5px; color:#fff; font-size:12px; cursor:pointer; padding:2px 6px; line-height:1.3; }
+.card .actions .star.on { color:var(--amber); }
+.chip { font-size:9px; letter-spacing:.4px; padding:2px 6px; border-radius:9px; border:1px solid; background:var(--panel); }
+.chip.deal { color:var(--green); border-color:var(--green); }
+.chip.worklist { color:var(--amber); border-color:var(--amber); }
+.chip.offer { color:var(--blue); border-color:var(--blue); }
+.chip.suspect { color:var(--red); border-color:var(--red); }
+.chip.watch { color:var(--bg); background:var(--amber); border-color:var(--amber); font-weight:700; }
+.chip.new { color:var(--bg); background:var(--green); border-color:var(--green); font-weight:700; }
+.chip.dim { color:var(--ink2); border-color:var(--border); }
+.chip.slab { color:var(--bg); background:var(--blue); border-color:var(--blue); font-weight:700; }
+
+.tip { position:fixed; pointer-events:none; background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:6px 9px; font-size:11px; display:none; z-index:9; }
+.empty { color:var(--muted); font-size:12px; padding:18px 0; text-align:center; }
+details { margin-top:8px; } summary { font-size:10px; color:var(--muted); cursor:pointer; }
+</style>
+<header>
+  <h1>CARD<span style="color:var(--green)">DEALS</span> <span class="dim">// vinted → comps</span></h1>
+  <div class="leds">
+    <span class="led" id="led-scan"><i></i>SCANNER</span>
+    <span class="led" id="led-track"><i></i>TRACKER</span>
+    <span id="clock"></span>
+    <button id="theme">☾/☀</button>
+  </div>
+</header>
+<nav>
+  <button id="tab-deals" class="on">DEALS</button>
+  <button id="tab-listings">LISTINGS</button>
+  <button id="tab-market">MARKET WATCH</button>
+</nav>
+
+<section id="view-listings" style="display:none">
+  <div class="panel" style="margin-bottom:12px">
+    <div class="fbar">
+      <input id="f-q" type="search" placeholder="search title…" autocomplete="off">
+      <span class="fgroup"><label>€</label><input id="f-min" type="number" min="0" step="5" placeholder="min" inputmode="numeric"><span class="dash">–</span><input id="f-max" type="number" min="0" step="5" placeholder="max" inputmode="numeric"></span>
+      <span class="fgroup" id="f-brands"></span>
+      <span class="fgroup" id="f-scope">
+        <button data-s="all" class="on">ALL</button>
+        <button data-s="new">NEW</button>
+        <button data-s="watch">★ WATCHLIST</button>
+        <button data-s="graded">SLABS</button>
+      </span>
+      <button id="f-reset" class="ghost">reset</button>
+      <span id="f-count" class="fcount"></span>
+    </div>
+  </div>
+  <div id="cards" class="cards"></div>
+  <div class="empty" id="cards-empty" style="display:none">nothing matches these filters</div>
+</section>
+
+<section id="view-deals">
+  <div class="band">
+    <div class="stat"><div class="k">POTENTIAL PROFIT*</div><div class="v green" id="s-profit">—</div></div>
+    <div class="stat"><div class="k">DEALS</div><div class="v green" id="s-deals">—</div></div>
+    <div class="stat"><div class="k">WORKLIST</div><div class="v amber" id="s-work">—</div></div>
+    <div class="stat"><div class="k">OFFER TARGETS</div><div class="v" style="color:var(--blue)" id="s-offer">—</div></div>
+    <div class="stat"><div class="k">NEEDS REVIEW</div><div class="v red" id="s-susp">—</div></div>
+    <div class="stat"><div class="k">EVALUATED</div><div class="v" id="s-eval">—</div></div>
+  </div>
+  <div class="tickerwrap"><div class="ticker" id="ticker"></div></div>
+  <div class="grid2">
+    <div class="panel"><h2>SCAN ACTIVITY — evaluations/hour, last 24h</h2><div id="activity"></div></div>
+    <div class="panel"><h2>VERDICT BREAKDOWN — all time</h2><div id="verdicts"></div></div>
+  </div>
+  <div class="panel">
+    <h2>FINDS</h2>
+    <div class="filters">
+      <button data-f="all" class="on">ALL</button>
+      <button data-f="fav">★ FAVORITES</button>
+      <button data-f="deal">DEALS</button>
+      <button data-f="offer">OFFERS</button>
+      <button data-f="suspect">SUSPECTS</button>
+    </div>
+    <div style="overflow-x:auto"><table id="finds">
+      <thead><tr>
+        <th></th><th data-s="title">TITLE</th><th data-s="verdict">VERDICT</th>
+        <th data-s="ask_eur">ASK€</th><th data-s="comp_median_eur">COMP€</th><th data-s="ratio">RATIO</th>
+        <th data-s="confidence">CONF</th><th data-s="grade">GRADE</th><th data-s="ts">WHEN</th><th></th><th></th>
+      </tr></thead><tbody></tbody>
+    </table></div>
+    <div class="empty" id="finds-empty" style="display:none">no finds yet — the scanner reports here the moment a listing comps above your thresholds</div>
+  </div>
+  <div class="panel" style="margin-top:14px">
+    <h2 id="slabs-head">COMPED SLABS</h2>
+    <p style="font-size:10px;color:var(--muted);margin:-4px 0 9px">
+      every graded card with a value — from the title lookup or the cert read off its photo
+    </p>
+    <div class="filters" id="slab-filters">
+      <button data-sf="all" class="on">ALL</button>
+      <button data-sf="cert">◈ VIA CERT</button>
+      <button data-sf="under">ASK UNDER VALUE</button>
+    </div>
+    <div style="overflow-x:auto"><table id="slabtable">
+      <thead><tr>
+        <th></th><th data-ss="title">CARD</th><th data-ss="slab">GRADE</th>
+        <th data-ss="ask_eur">ASK€</th><th data-ss="comp">VALUE€</th><th data-ss="ratio">RATIO</th>
+        <th data-ss="verdict">VERDICT</th><th data-ss="first_seen">SEEN</th>
+      </tr></thead><tbody></tbody>
+    </table></div>
+    <div class="empty" id="slabs-empty" style="display:none">no comped slabs yet</div>
+  </div>
+
+  <div class="panel" style="margin-top:14px">
+    <h2 id="watch-head">WATCHLIST</h2>
+    <div style="overflow-x:auto"><table id="watch">
+      <thead><tr><th></th><th>WHO</th><th>TITLE</th><th>ASK€</th><th>WHEN</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="empty" id="watch-empty" style="display:none">no watchlist hits yet — you'll get a notification the moment a tracked name is listed</div>
+  </div>
+
+  <div class="panel" style="margin-top:14px">
+    <h2 id="evals-head">COMP LOG</h2>
+    <p style="font-size:10px;color:var(--muted);margin:-4px 0 9px">
+      every listing the comp engine has looked at, newest first — 12 per 10-minute cycle, taken newest-first from each feed
+    </p>
+    <div class="filters" id="ev-filters">
+      <button data-e="all" class="on">ALL</button>
+      <button data-e="priced">GOT A COMP</button>
+      <button data-e="low_confidence">NO COMP</button>
+      <button data-e="skip">SKIPPED</button>
+    </div>
+    <div style="overflow-x:auto"><table id="evals">
+      <thead><tr><th>WHEN</th><th>TITLE</th><th>VERDICT</th><th>ASK€</th><th>COMP€</th><th>RATIO</th><th>CONF</th><th>RE-EVAL</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+  <p style="font-size:10px;color:var(--muted);margin-top:8px">*sum of (comp × (1 − fee) − ask) over deals + worklist, suspects and offer targets excluded</p>
+</section>
+
+<section id="view-market" style="display:none"></section>
+<div class="tip" id="tip"></div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const fmtE = (v) => "€" + (+v).toFixed(2);
+let DATA = null, sortKey = "ts", sortDir = -1, filter = "all", zooms = {};
+
+// theme: dark-first, manual toggle wins, stored
+const savedTheme = localStorage.getItem("theme");
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+$("#theme").onclick = () => {
+  const cur = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = cur;
+  localStorage.setItem("theme", cur);
+  render();
+};
+
+const TABS = ["deals", "listings", "market"];
+for (const t of TABS) $(`#tab-${t}`).onclick = () => switchTab(t);
+function switchTab(t) {
+  for (const x of TABS) {
+    $(`#tab-${x}`).classList.toggle("on", x === t);
+    $(`#view-${x}`).style.display = x === t ? "" : "none";
+  }
+  localStorage.setItem("tab", t);
+}
+switchTab(localStorage.getItem("tab") || "deals");
+
+setInterval(() => { $("#clock").textContent = new Date().toLocaleTimeString("lt-LT"); }, 1000);
+
+// count-up animation
+const shown = {};
+function countUp(id, target, fmt) {
+  const el = $(id);
+  const from = shown[id] ?? 0;
+  shown[id] = target;
+  if (from === target) { el.textContent = fmt(target); return; }
+  const t0 = performance.now();
+  (function step(t) {
+    const p = Math.min(1, (t - t0) / 600);
+    el.textContent = fmt(from + (target - from) * (1 - Math.pow(1 - p, 3)));
+    if (p < 1) requestAnimationFrame(step);
+  })(t0);
+}
+
+function led(id, ageS, staleS) {
+  const el = $(id);
+  el.className = "led " + (ageS == null ? "err" : ageS < staleS ? "ok" : ageS < staleS * 3 ? "warn" : "err");
+}
+
+async function poll() {
+  try {
+    DATA = await (await fetch("/data")).json();
+    render();
+  } catch (e) { /* server briefly away — keep last view */ }
+}
+
+function render() {
+  if (!DATA) return;
+  const d = DATA;
+  // Allow a full extra cycle of headroom before warning: the log only goes quiet
+  // between cycles, and a cycle doing paid lookups legitimately runs long.
+  const scanStale = ((d.config?.scan_interval_min ?? 10) * 2 + 10) * 60;
+  const trackStale = ((d.config?.tracker_interval_min ?? 30) * 2 + 10) * 60;
+  led("#led-scan", d.health.scanner_age_s, scanStale);
+  led("#led-track", d.health.tracker_age_s, trackStale);
+  $("#led-scan").title = `last activity ${Math.round(d.health.scanner_age_s / 60)} min ago · green under ${Math.round(scanStale / 60)} min`;
+  $("#led-track").title = `last sample ${Math.round(d.health.tracker_age_s / 60)} min ago · green under ${Math.round(trackStale / 60)} min`;
+  countUp("#s-profit", d.stats.profit, (v) => fmtE(v));
+  countUp("#s-deals", d.stats.deals, (v) => Math.round(v));
+  countUp("#s-work", d.stats.worklist, (v) => Math.round(v));
+  countUp("#s-offer", d.stats.offers, (v) => Math.round(v));
+  countUp("#s-susp", d.stats.suspects, (v) => Math.round(v));
+  countUp("#s-eval", d.stats.evaluated, (v) => Math.round(v));
+
+  // ticker (doubled for seamless loop)
+  const tick = d.ticker.map((e) =>
+    `<span><b>${esc(e.title.slice(0, 40))}</b> ${e.verdict.replace("_", " ")} ${e.ask_eur ? "ask " + fmtE(e.ask_eur) : ""} ${e.ratio ? "×" + e.ratio : ""}</span>`).join("");
+  $("#ticker").innerHTML = tick + tick;
+
+  renderActivity(d.activity);
+  renderVerdicts(d.verdicts);
+  renderFinds(d.finds);
+  renderListings(d.listings || []);
+  renderSlabTable(d.listings || []);
+  renderWatch(d.watchlist || [], d.watch_config || {});
+  renderEvals(d.evals || []);
+  renderMarket(d.market);
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+function renderActivity(act) {
+  const W = 520, H = 120, max = Math.max(1, ...act.map((a) => a.n));
+  const bw = W / 24;
+  let s = `<svg viewBox="0 0 ${W} ${H + 16}" style="width:100%">`;
+  act.forEach((a, i) => {
+    const h = Math.round((a.n / max) * (H - 14));
+    const hour = (new Date(Date.now() - (23 - i) * 3600e3)).getHours();
+    s += `<rect x="${(i * bw + 1).toFixed(1)}" y="${H - h}" width="${(bw - 2).toFixed(1)}" height="${h}" rx="3" fill="${css("--green")}" data-tip="${String(hour).padStart(2, "0")}:00 — ${a.n} evaluated"/>`;
+    if (i % 4 === 0) s += `<text x="${(i * bw + bw / 2).toFixed(1)}" y="${H + 12}" text-anchor="middle">${String(hour).padStart(2, "0")}</text>`;
+  });
+  s += "</svg>";
+  $("#activity").innerHTML = s;
+}
+
+const VCOLORS = { deal: "--green", worklist: "--amber", offer: "--blue", suspect_ratio: "--red", suspect_authenticity: "--red", low_confidence: "--muted", no_deal: "--ink2", skip_lot: "--muted", skip_no_price: "--muted", transient: "--muted" };
+function renderVerdicts(v) {
+  const entries = Object.entries(v).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...entries.map(([, n]) => n));
+  $("#verdicts").innerHTML = entries.map(([k, n]) =>
+    `<div class="vrow"><span class="lbl">${k.replace("_", " ")}</span>
+     <span class="bar" style="width:${(n / max) * 55}%;background:var(${VCOLORS[k] || "--muted"})"></span>
+     <span class="n">${n}</span></div>`).join("") || '<div class="empty">nothing evaluated yet</div>';
+}
+
+document.querySelectorAll("#finds th[data-s]").forEach((th) => {
+  th.onclick = () => {
+    const k = th.dataset.s;
+    if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = -1; }
+    render();
+  };
+});
+document.querySelectorAll(".filters button").forEach((b) => {
+  b.onclick = () => {
+    filter = b.dataset.f;
+    document.querySelectorAll(".filters button").forEach((x) => x.classList.toggle("on", x === b));
+    render();
+  };
+});
+
+function renderFinds(finds) {
+  let rows = finds;
+  if (filter === "fav") rows = rows.filter((f) => f.fav);
+  else if (filter === "deal") rows = rows.filter((f) => f.verdict === "deal");
+  else if (filter === "suspect") rows = rows.filter((f) => f.verdict.startsWith("suspect"));
+  const num = ["ask_eur", "comp_median_eur", "ratio"];
+  rows = [...rows].sort((a, b) => {
+    const [x, y] = [a[sortKey], b[sortKey]];
+    return (num.includes(sortKey) ? (+x || 0) - (+y || 0) : String(x).localeCompare(String(y))) * sortDir;
+  });
+  $("#finds-empty").style.display = rows.length ? "none" : "";
+  $("#finds tbody").innerHTML = rows.map((f) => {
+    const susp = f.verdict.startsWith("suspect");
+    const badge = susp ? "suspect" : f.verdict;
+    const warn = f.verdict === "suspect_authenticity" ? "⚠ verify authenticity" : f.verdict === "suspect_ratio" ? "⚠ needs review" : f.verdict;
+    return `<tr>
+      <td>${f.thumb ? `<img loading="lazy" src="/thumb?u=${encodeURIComponent(f.thumb)}" alt="">` : ""}</td>
+      <td style="max-width:260px"><a href="${esc(f.vinted_url)}" target="_blank" rel="noopener">${esc(f.title)}</a></td>
+      <td><span class="badge ${badge}">${warn.replace("_", " ")}</span></td>
+      <td>${fmtE(f.ask_eur)}</td>
+      <td><a href="${esc(f.comp_url)}" target="_blank" rel="noopener">${fmtE(f.comp_median_eur)}</a></td>
+      <td><b>×${f.ratio}</b></td>
+      <td>${f.confidence}</td><td>${esc(f.grade)}</td>
+      <td title="${f.ts}">${new Date(f.ts).toLocaleString("lt-LT", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
+      <td><button class="star ${f.fav ? "on" : ""}" data-id="${f.id}">★</button></td>
+      <td><button class="dis" data-id="${f.id}">✕</button></td>
+    </tr>`;
+  }).join("");
+  document.querySelectorAll(".star").forEach((b) => b.onclick = () => action("fav", b.dataset.id));
+  document.querySelectorAll(".dis").forEach((b) => b.onclick = () => action("dismiss", b.dataset.id));
+}
+
+// ---- Listings browser ----
+const LF = { q: "", min: null, max: null, brands: new Set(), scope: "all" };
+let brandsRendered = false;
+// "New" = listed since you last opened this tab, so the badge means something.
+// On a first-ever visit there is no baseline, so nothing is marked new rather
+// than marking everything new (which would make the badge meaningless).
+const firstVisit = !localStorage.getItem("lastMaxId");
+const lastVisit = firstVisit ? Infinity : Number(localStorage.getItem("lastMaxId"));
+
+function bindListingFilters() {
+  const debounce = (fn, ms = 180) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+  $("#f-q").oninput = debounce((e) => { LF.q = e.target.value.trim().toLowerCase(); paintListings(); });
+  $("#f-min").oninput = debounce((e) => { LF.min = e.target.value === "" ? null : +e.target.value; paintListings(); });
+  $("#f-max").oninput = debounce((e) => { LF.max = e.target.value === "" ? null : +e.target.value; paintListings(); });
+  $("#f-scope").querySelectorAll("button").forEach((b) => b.onclick = () => {
+    LF.scope = b.dataset.s;
+    $("#f-scope").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    paintListings();
+  });
+  $("#f-reset").onclick = () => {
+    LF.q = ""; LF.min = LF.max = null; LF.brands.clear(); LF.scope = "all";
+    $("#f-q").value = ""; $("#f-min").value = ""; $("#f-max").value = "";
+    $("#f-brands").querySelectorAll("button").forEach((x) => x.classList.remove("on"));
+    $("#f-scope").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.s === "all"));
+    paintListings();
+  };
+}
+
+let ALL_LISTINGS = [];
+function renderListings(list) {
+  ALL_LISTINGS = list;
+  if (!brandsRendered) {
+    bindListingFilters();
+    brandsRendered = true;
+  }
+  // brand chips come from the data, so they always match what's actually there
+  const counts = {};
+  for (const l of list) if (l.brand) counts[l.brand] = (counts[l.brand] || 0) + 1;
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const holder = $("#f-brands");
+  if (holder.dataset.sig !== top.map((t) => t[0]).join("|")) {
+    holder.dataset.sig = top.map((t) => t[0]).join("|");
+    holder.innerHTML = top.map(([b, n]) => `<button data-b="${esc(b)}" ${LF.brands.has(b) ? 'class="on"' : ""}>${esc(b)} <span style="opacity:.55">${n}</span></button>`).join("");
+    holder.querySelectorAll("button").forEach((btn) => btn.onclick = () => {
+      const b = btn.dataset.b;
+      LF.brands.has(b) ? LF.brands.delete(b) : LF.brands.add(b);
+      btn.classList.toggle("on", LF.brands.has(b));
+      paintListings();
+    });
+  }
+  paintListings();
+  // The watermark must NOT advance on every 30s poll — doing that made "NEW"
+  // permanently empty for a tab left open. Record it on the way out instead, so
+  // NEW means "arrived since you last had this page open".
+  latestSeenId = Math.max(latestSeenId, ...list.map((l) => Number(l.id) || 0));
+}
+
+let latestSeenId = 0;
+addEventListener("pagehide", () => {
+  if (latestSeenId) localStorage.setItem("lastMaxId", String(latestSeenId));
+});
+
+function paintListings() {
+  const rows = ALL_LISTINGS.filter((l) => {
+    const ask = parseFloat(l.ask_eur);
+    if (LF.q && !l.title.toLowerCase().includes(LF.q)) return false;
+    if (LF.min != null && !(ask >= LF.min)) return false;
+    if (LF.max != null && !(ask <= LF.max)) return false;
+    if (LF.brands.size && !LF.brands.has(l.brand)) return false;
+    if (LF.scope === "new" && Number(l.id) <= lastVisit) return false;
+    if (LF.scope === "watch" && !l.watch) return false;
+    if (LF.scope === "graded" && !l.slab) return false;
+    return true;
+  });
+  const nNew = ALL_LISTINGS.filter((l) => Number(l.id) > lastVisit).length;
+  $("#f-count").textContent = `${rows.length} of ${ALL_LISTINGS.length}${nNew ? ` · ${nNew} new` : ""}`;
+  $("#cards-empty").style.display = rows.length ? "none" : "";
+  $("#cards").innerHTML = rows.slice(0, 240).map((l) => {
+    const v = l.verdict;
+    const chip = v && v !== "no_deal" && v !== "low_confidence" && !v.startsWith("skip")
+      ? `<span class="chip ${v.startsWith("suspect") ? "suspect" : v}">${v.startsWith("suspect") ? "⚠ review" : v}${l.ratio ? " ×" + l.ratio : ""}</span>` : "";
+    const isNew = Number(l.id) > lastVisit;
+    return `<article class="card">
+      <div class="marks">
+        ${isNew ? '<span class="chip new">NEW</span>' : ""}
+        ${l.watch ? `<span class="chip watch">★ ${esc(l.watch)}</span>` : ""}
+        ${l.slab ? `<span class="chip slab">◈ ${esc(l.slab)}</span>` : ""}
+        ${chip}
+        ${!v ? '<span class="chip dim">queued</span>' : ""}
+      </div>
+      <div class="actions">
+        <button class="star ${l.fav ? "on" : ""}" data-id="${l.id}" title="favourite">★</button>
+        <button class="dis" data-id="${l.id}" title="hide">✕</button>
+      </div>
+      <div class="ph">${l.thumb ? `<img loading="lazy" src="/thumb?u=${encodeURIComponent(l.thumb)}" alt="">` : ""}</div>
+      <div class="body">
+        <div class="t"><a href="${esc(l.vinted_url)}" target="_blank" rel="noopener">${esc(l.title)}</a></div>
+        <div class="row">
+          <span class="price">${l.ask_eur ? fmtE(l.ask_eur) : "—"}</span>
+          <span class="meta" style="margin-left:auto">${l.comp ? "comp " + fmtE(l.comp) : esc(l.brand || "")}</span>
+        </div>
+      </div>
+    </article>`;
+  }).join("");
+  $("#cards").querySelectorAll(".star").forEach((b) => b.onclick = () => action("fav", b.dataset.id));
+  $("#cards").querySelectorAll(".dis").forEach((b) => b.onclick = () => action("dismiss", b.dataset.id));
+}
+
+// ---- Comped slabs table ----
+let slabFilter = "all", slabSort = "ratio", slabDir = -1;
+function bindSlabTable() {
+  document.querySelectorAll("#slab-filters button").forEach((b) => b.onclick = () => {
+    slabFilter = b.dataset.sf;
+    document.querySelectorAll("#slab-filters button").forEach((x) => x.classList.toggle("on", x === b));
+    render();
+  });
+  document.querySelectorAll("#slabtable th[data-ss]").forEach((th) => th.onclick = () => {
+    const k = th.dataset.ss;
+    if (slabSort === k) slabDir *= -1; else { slabSort = k; slabDir = -1; }
+    render();
+  });
+}
+
+function renderSlabTable(listings) {
+  let rows = listings.filter((l) => l.slab && l.comp);
+  const total = rows.length;
+  // "via cert" rows carry the cert marker the re-eval writes into the title
+  const viaCert = (l) => !!l.via_cert;
+  if (slabFilter === "cert") rows = rows.filter(viaCert);
+  else if (slabFilter === "under") rows = rows.filter((l) => parseFloat(l.ask_eur) < parseFloat(l.comp));
+
+  const num = ["ask_eur", "comp", "ratio"];
+  rows = [...rows].sort((a, b) => {
+    const [x, y] = [a[slabSort], b[slabSort]];
+    return (num.includes(slabSort) ? (+x || 0) - (+y || 0) : String(x ?? "").localeCompare(String(y ?? ""))) * slabDir;
+  });
+
+  $("#slabs-head").textContent = `COMPED SLABS — ${rows.length}${rows.length !== total ? " of " + total : ""}`;
+  $("#slabs-empty").style.display = rows.length ? "none" : "";
+  $("#slabtable tbody").innerHTML = rows.map((l) => {
+    const ask = parseFloat(l.ask_eur), val = parseFloat(l.comp);
+    const under = ask < val;
+    const v = l.verdict || "";
+    const badge = v && v !== "no_deal"
+      ? `<span class="badge ${v.startsWith("suspect") ? "suspect" : v}">${v.startsWith("suspect") ? "⚠ review" : v.replace(/_/g, " ")}</span>`
+      : '<span class="meta">—</span>';
+    return `<tr>
+      <td>${l.thumb ? `<img loading="lazy" src="/thumb?u=${encodeURIComponent(l.thumb)}" alt="">` : ""}</td>
+      <td style="max-width:300px"><a href="${esc(l.vinted_url)}" target="_blank" rel="noopener">${esc(l.title)}</a>
+        ${viaCert(l) ? '<span class="chip slab" style="margin-left:5px">◈ cert</span>' : ""}
+        ${l.resolved_as ? `<div class="meta" style="margin-top:2px">→ ${esc(l.resolved_as)}</div>` : ""}</td>
+      <td><span class="chip slab">${esc(l.slab)}</span></td>
+      <td>${fmtE(ask)}</td>
+      <td style="color:${under ? "var(--green)" : "var(--ink)"}">${fmtE(val)}</td>
+      <td><b style="color:${under ? "var(--green)" : "var(--ink2)"}">×${l.ratio || (val / ask).toFixed(2)}</b></td>
+      <td>${badge}</td>
+      <td title="${l.first_seen}">${new Date(l.first_seen).toLocaleString("lt-LT", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderWatch(hits, cfg) {
+  $("#watch-head").textContent = `WATCHLIST — ${(cfg.names || []).join(", ") || "none configured"} · min €${cfg.min ?? 0}`;
+  $("#watch-empty").style.display = hits.length ? "none" : "";
+  $("#watch tbody").innerHTML = hits.map((w) => `<tr>
+    <td>${w.thumb ? `<img loading="lazy" src="/thumb?u=${encodeURIComponent(w.thumb)}" alt="">` : ""}</td>
+    <td><span class="badge deal">${esc(w.watch_name)}</span></td>
+    <td style="max-width:340px"><a href="${esc(w.vinted_url)}" target="_blank" rel="noopener">${esc(w.title)}</a></td>
+    <td>${fmtE(w.ask_eur)}</td>
+    <td title="${w.ts}">${new Date(w.ts).toLocaleString("lt-LT", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
+    <td><button class="dis" data-id="${w.id}">✕</button></td>
+  </tr>`).join("");
+  $("#watch tbody").querySelectorAll(".dis").forEach((b) => b.onclick = () => action("dismiss", b.dataset.id));
+}
+
+let evFilter = "all";
+function bindEvalFilters() {
+  document.querySelectorAll("#ev-filters button").forEach((b) => b.onclick = () => {
+    evFilter = b.dataset.e;
+    document.querySelectorAll("#ev-filters button").forEach((x) => x.classList.toggle("on", x === b));
+    render();
+  });
+}
+
+function renderEvals(all) {
+  const svc = DATA.id_services || {};
+  const evals = all.filter((e) => {
+    if (evFilter === "all") return true;
+    if (evFilter === "priced") return e.comp_median_eur !== "" && e.comp_median_eur != null;
+    if (evFilter === "low_confidence") return e.verdict === "low_confidence";
+    if (evFilter === "skip") return e.verdict.startsWith("skip");
+    return true;
+  });
+  $("#evals-head").textContent = `COMP LOG — showing ${evals.length} of ${all.length}`;
+  $("#evals tbody").innerHTML = evals.map((e) => {
+    const susp = e.verdict.startsWith("suspect");
+    const canPhoto = e.verdict === "low_confidence" && e.thumb;
+    const buttons = e.verdict === "low_confidence"
+      ? `<button class="reeval" data-id="${e.id}" data-mode="photo" ${!svc.ximilar || !e.thumb ? "disabled" : ""}
+           title="${svc.ximilar ? (canPhoto ? `identify from photo (${svc.ximilar_calls_today}/${svc.ximilar_cap} used today)` : "no photo stored") : "add XIMILAR_TOKEN to config.json"}">📷 ID</button>
+         <button class="reeval" data-id="${e.id}" data-mode="cert" ${!svc.cert ? "disabled" : ""}
+           title="${svc.cert ? "type the cert number off the slab — exact valuation, no title guessing" : "add CARDHEDGER_TOKEN or PSA_TOKEN to config.json"}">◈ CERT</button>`
+      : "";
+    return `<tr>
+      <td title="${e.ts}">${new Date(e.ts).toLocaleString("lt-LT", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
+      <td style="max-width:320px"><a href="${esc(e.vinted_url)}" target="_blank" rel="noopener">${esc(e.title)}</a></td>
+      <td><span class="badge ${susp ? "suspect" : e.verdict}">${e.verdict.replace(/_/g, " ")}</span></td>
+      <td>${e.ask_eur ? fmtE(e.ask_eur) : "—"}</td>
+      <td>${e.comp_median_eur ? fmtE(e.comp_median_eur) : "—"}</td>
+      <td>${e.ratio ? "×" + e.ratio : "—"}</td>
+      <td>${e.confidence || "—"}</td>
+      <td style="white-space:nowrap">${buttons}</td>
+    </tr>`;
+  }).join("");
+  document.querySelectorAll(".reeval").forEach((b) => b.onclick = () => reeval(b));
+}
+
+async function reeval(btn) {
+  const { id, mode } = btn.dataset;
+  let cert = null;
+  if (mode === "cert") {
+    cert = prompt("Cert number from the slab label (PSA / BGS / CGC / SGC):");
+    if (!cert) return;
+  }
+  btn.disabled = true;
+  btn.textContent = "…";
+  try {
+    const r = await fetch("/reeval", { method: "POST", body: JSON.stringify({ id, mode, cert }) });
+    const j = await r.json();
+    if (j.error) alert("Re-eval failed: " + j.error);
+    else alert([
+      j.new_title,
+      "",
+      `Verdict: ${j.verdict}${j.ratio ? "  ×" + j.ratio : ""}`,
+      j.comp_median ? `Value:   €${j.comp_median}${j.range ? "  (" + j.range + ")" : ""}` : null,
+      j.confidence ? `Basis:   ${j.confidence}` : null,
+      j.population ? `Pop:     ${j.population} at this grade` : null,
+      j.source ? `Source:  ${j.source}` : null,
+    ].filter((x) => x !== null).join("\n"));
+  } catch (e) {
+    alert("Re-eval error: " + e.message);
+  }
+  poll();
+}
+
+async function action(op, id) {
+  await fetch("/action", { method: "POST", body: JSON.stringify({ op, id }) });
+  poll();
+}
+
+const ZOOMS = { "24h": 24 * 3600e3, "7d": 7 * 86400e3, "30d": 30 * 86400e3, all: Infinity };
+function renderMarket(market) {
+  const view = $("#view-market");
+  const names = Object.keys(market);
+  if (!names.length) { view.innerHTML = '<div class="panel"><div class="empty">market tracker warming up — first samples land within ~30 min of dashboard start</div></div>'; return; }
+  view.innerHTML = names.map((name, i) => {
+    const z = zooms[name] || "7d";
+    const rows = market[name].filter((r) => Date.now() - Date.parse(r.ts) < ZOOMS[z]);
+    const last = market[name][market[name].length - 1];
+    return `<div class="panel mcard" data-name="${esc(name)}">
+      <div class="mhead">
+        <span class="name">${esc(name)}</span>
+        <span class="cur">${last ? fmtE(last.median) : "—"} median</span>
+        <span class="mm">${last ? `range ${fmtE(last.min)}–${fmtE(last.max)} · n=${last.n}` : ""}</span>
+        <span class="zoom">${Object.keys(ZOOMS).map((k) => `<button data-z="${k}" ${k === z ? 'class="on"' : ""}>${k}</button>`).join("")}</span>
+      </div>
+      ${chartSvg(rows)}
+      <details><summary>data table</summary><div style="overflow-x:auto"><table>
+        <thead><tr><th>time</th><th>avg</th><th>median</th><th>min</th><th>max</th><th>n</th></tr></thead>
+        <tbody>${rows.slice(-20).reverse().map((r) => `<tr><td>${new Date(r.ts).toLocaleString("lt-LT")}</td><td>${fmtE(r.avg)}</td><td>${fmtE(r.median)}</td><td>${fmtE(r.min)}</td><td>${fmtE(r.max)}</td><td>${r.n}</td></tr>`).join("")}</tbody>
+      </table></div></details>
+    </div>`;
+  }).join("");
+  view.querySelectorAll(".zoom button").forEach((b) => {
+    b.onclick = () => { zooms[b.closest(".mcard").dataset.name] = b.dataset.z; render(); };
+  });
+}
+
+function chartSvg(rows) {
+  const W = 900, H = 190, P = { l: 52, r: 10, t: 8, b: 20 };
+  if (rows.length < 2) return `<div class="empty">not enough samples in this window yet (${rows.length})</div>`;
+  const t0 = Date.parse(rows[0].ts), t1 = Date.parse(rows[rows.length - 1].ts);
+  const lo = Math.min(...rows.map((r) => r.min)), hi = Math.max(...rows.map((r) => r.max));
+  const pad = (hi - lo) * 0.08 || 1;
+  const X = (t) => P.l + ((t - t0) / Math.max(1, t1 - t0)) * (W - P.l - P.r);
+  const Y = (v) => P.t + (1 - (v - (lo - pad)) / (hi + pad - (lo - pad))) * (H - P.t - P.b);
+  const line = (key) => rows.map((r, i) => `${i ? "L" : "M"}${X(Date.parse(r.ts)).toFixed(1)},${Y(r[key]).toFixed(1)}`).join("");
+  const band = rows.map((r, i) => `${i ? "L" : "M"}${X(Date.parse(r.ts)).toFixed(1)},${Y(r.max).toFixed(1)}`).join("") +
+    [...rows].reverse().map((r) => `L${X(Date.parse(r.ts)).toFixed(1)},${Y(r.min).toFixed(1)}`).join("") + "Z";
+  let ticks = "";
+  for (let i = 0; i <= 4; i++) {
+    const v = lo - pad + ((hi + pad) - (lo - pad)) * (i / 4);
+    ticks += `<line x1="${P.l}" x2="${W - P.r}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="var(--border)" stroke-width="0.5"/>
+      <text x="${P.l - 6}" y="${(Y(v) + 3).toFixed(1)}" text-anchor="end">€${v.toFixed(0)}</text>`;
+  }
+  const pts = rows.map((r) => `<circle cx="${X(Date.parse(r.ts)).toFixed(1)}" cy="${Y(r.avg).toFixed(1)}" r="7" fill="transparent" data-tip="${new Date(r.ts).toLocaleString("lt-LT")} — avg ${fmtE(r.avg)} · med ${fmtE(r.median)} · ${fmtE(r.min)}–${fmtE(r.max)}"/>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%">
+    ${ticks}
+    <path d="${band}" fill="var(--green)" opacity="0.13"/>
+    <path d="${line("avg")}" fill="none" stroke="var(--green)" stroke-width="2"/>
+    ${pts}
+    <text x="${P.l}" y="${H - 4}">${new Date(t0).toLocaleDateString("lt-LT")}</text>
+    <text x="${W - P.r}" y="${H - 4}" text-anchor="end">${new Date(t1).toLocaleDateString("lt-LT")}</text>
+  </svg>`;
+}
+
+// shared tooltip for any [data-tip]
+document.addEventListener("mousemove", (e) => {
+  const t = e.target.closest("[data-tip]");
+  const tip = $("#tip");
+  if (t) {
+    tip.textContent = t.dataset.tip;
+    tip.style.display = "block";
+    tip.style.left = Math.min(innerWidth - 240, e.clientX + 14) + "px";
+    tip.style.top = (e.clientY + 14) + "px";
+  } else tip.style.display = "none";
+});
+
+bindEvalFilters();
+bindSlabTable();
+poll();
+setInterval(poll, 30000);
+</script>
